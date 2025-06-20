@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <title>TaxBot Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body{background:linear-gradient(135deg,rgba(102,126,234,.9),rgba(118,75,162,.9)),url('/static/images/tax_background.jpg') center/cover fixed;height:100vh;overflow:hidden}
+        .floating-bot{position:fixed;bottom:20px;right:20px;z-index:50}
+        .bot-icon{width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#4facfe,#00f2fe);display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;box-shadow:0 8px 24px rgba(0,0,0,.3);cursor:pointer;transition:transform .2s,box-shadow .2s}
+        .bot-icon:hover{transform:scale(1.1);box-shadow:0 12px 32px rgba(0,0,0,.4)}
+        .chatbox{position:fixed;bottom:100px;right:20px;width:100%;max-width:370px;height:500px;background:rgba(255,255,255,.98);border-radius:1rem;box-shadow:0 12px 40px rgba(0,0,0,.3);display:none;flex-direction:column;overflow:hidden;z-index:100;backdrop-filter:blur(15px);transition:all .3s ease}
+        .chatbox.fullscreen{top:10px;left:10px;right:10px;bottom:10px;max-width:none;height:calc(100vh-20px);border-radius:0}
+        .star{font-size:22px;color:#d1d5db;cursor:pointer;transition:color .2s,transform .2s}
+        .star:hover{transform:scale(1.2)}
+        .star.active{color:#fbbf24}
+        .message{margin-bottom:12px;padding:12px 16px;border-radius:16px;max-width:80%;word-wrap:break-word;animation:fadeIn .3s ease-out}
+        .message.user{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;margin-left:auto;border-bottom-right-radius:4px}
+        .message.bot{background:#fff;color:#333;border:1px solid #e0e0e0;margin-right:auto;border-bottom-left-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+        .typing{display:none;padding:12px 16px;background:#fff;border-radius:16px;border-bottom-left-radius:4px;margin-right:auto;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+        .typing-dots{display:flex;gap:4px}
+        .typing-dot{width:8px;height:8px;background:#4facfe;border-radius:50%;animation:typing 1.4s infinite}
+        .typing-dot:nth-child(2){animation-delay:.2s}
+        .typing-dot:nth-child(3){animation-delay:.4s}
+        .voice-status{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.85);color:#fff;padding:16px 24px;border-radius:8px;z-index:1000;display:none;backdrop-filter:blur(10px)}
+        .voice-status.show{display:block;animation:fadeIn .3s}
+        .mic-btn{background:linear-gradient(135deg,#ff6b6b,#ee5a52);color:#fff;border:none;border-radius:50%;width:40px;height:40px;cursor:pointer;font-size:18px;transition:transform .2s}
+        .mic-btn:hover{transform:scale(1.1)}
+        .mic-btn.listening{background:linear-gradient(135deg,#51cf66,#40c057);animation:pulse 1.5s infinite}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes typing{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-8px)}}
+        @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
+        @media (max-width:500px){.chatbox{bottom:80px;width:95%;right:2.5%}.chatbox.fullscreen{top:0;left:0;right:0;bottom:0;width:100%;height:100vh;border-radius:0}}
+    </style>
+</head>
+<body class="text-gray-900">
+<div class="text-center mt-32 px-4">
+    <h1 class="text-4xl font-bold text-white drop-shadow-lg">Welcome to the Tax Bot Assistant</h1>
+    <p class="text-gray-200 mt-2">Your AI-powered guide for tax regime decisions</p>
+</div>
+<div class="floating-bot">
+    <div class="bot-icon" onclick="toggleChat()">🤖</div>
+</div>
+<div class="chatbox" id="chatBox">
+    <div class="bg-gradient-to-r from-blue-600 to-blue-500 text-white p-4 text-center font-semibold flex justify-between items-center">
+        <span>TaxBot Assistant</span>
+        <button onclick="toggleFullscreen()" class="text-white hover:bg-white hover:bg-opacity-20 rounded px-2 py-1 text-sm">⛶</button>
+    </div>
+    <div id="chat-window" class="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-slate-50 to-slate-100 text-sm" style="height:300px;max-height:none">
+        <div class="message bot">👋 Hi! I'm your TaxBot. Ask me anything about old vs new regime, deductions, or slabs.</div>
+    </div>
+    <div class="typing" id="typing">
+        <div class="typing-dots">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        </div>
+    </div>
+    <div class="flex items-center gap-2 p-3 border-t bg-white">
+        <button class="mic-btn" id="voiceBtn" onclick="startVoice()">🎤</button>
+        <input id="message" type="text" placeholder="Type or use voice..." class="flex-1 border-2 border-gray-200 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition-all" onkeydown="if(event.key==='Enter'){sendMessage()}"/>
+        <button onclick="sendMessage()" class="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-2 rounded-full text-sm font-medium hover:from-blue-700 hover:to-blue-600 transition-all">Send</button>
+    </div>
+    <div class="p-4 border-t text-center text-sm text-gray-700 bg-gradient-to-r from-gray-50 to-gray-100">
+        Rate TaxBot:<br/>
+        <div id="stars" class="flex justify-center gap-1 mt-2">
+            <span class="star" onclick="rateBot(1)">★</span>
+            <span class="star" onclick="rateBot(2)">★</span>
+            <span class="star" onclick="rateBot(3)">★</span>
+            <span class="star" onclick="rateBot(4)">★</span>
+            <span class="star" onclick="rateBot(5)">★</span>
+        </div>
+    </div>
+</div>
+<div class="voice-status" id="voiceStatus">🎤 Listening... Speak now!</div>
+<script>
+    const chatBox=document.getElementById("chatBox");
+    const chatWindow=document.getElementById("chat-window");
+    const messageInput=document.getElementById("message");
+    const typing=document.getElementById("typing");
+    const voiceBtn=document.getElementById("voiceBtn");
+    const voiceStatus=document.getElementById("voiceStatus");
+    let recognition=null;
+    let isFullscreen=false;
+    function toggleChat(){
+    chatBox.style.display=chatBox.style.display==="flex"?"none":"flex";
+    if(chatBox.style.display==="flex"){
+    if(window.innerWidth<=768){toggleFullscreen(true);}
+    messageInput.focus();
+    setTimeout(()=>chatWindow.scrollTop=chatWindow.scrollHeight,100);
+    }}
+    function toggleFullscreen(force=null){
+    isFullscreen=force!==null?force:!isFullscreen;
+    chatBox.classList.toggle('fullscreen',isFullscreen);
+    setTimeout(()=>chatWindow.scrollTop=chatWindow.scrollHeight,100);
+    }
+    function appendMessage(content,isUser){
+    const msg=document.createElement("div");
+    msg.className=`message ${isUser?'user':'bot'}`;
+    msg.textContent=content;
+    chatWindow.appendChild(msg);
+    setTimeout(()=>chatWindow.scrollTop=chatWindow.scrollHeight,50);
+    }
+    function showTyping(){typing.style.display='block';setTimeout(()=>chatWindow.scrollTop=chatWindow.scrollHeight,50);}
+    function hideTyping(){typing.style.display='none';}
+    async function sendMessage(){
+    const message=messageInput.value.trim();
+    if(!message)return;
+    appendMessage(message,true);
+    messageInput.value="";
+    showTyping();
+    try{
+    const response=await fetch("/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message})});
+    const data=await response.json();
+    hideTyping();
+    appendMessage(data.reply||"Sorry, I couldn't understand that.",false);
+    }catch{
+    hideTyping();
+    appendMessage("⚠️ Failed to contact the assistant.",false);}}
+    function rateBot(rating){
+    const stars=document.querySelectorAll(".star");
+    stars.forEach((star,i)=>star.classList.toggle("active",i<rating));
+    alert(`Thanks for rating TaxBot ${rating} star${rating>1?'s':''}!`);}
+    function startVoice(){
+    if(!recognition){
+    if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
+    alert('Speech recognition not supported');return;}
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    recognition=new SpeechRecognition();
+    recognition.lang='en-IN';
+    recognition.continuous=false;
+    recognition.interimResults=true;
+    recognition.onstart=()=>{voiceBtn.classList.add('listening');voiceBtn.textContent='🔴';voiceStatus.classList.add('show');};
+    recognition.onresult=(event)=>{let transcript='';for(let i=event.resultIndex;i<event.results.length;i++){transcript+=event.results[i][0].transcript;}messageInput.value=transcript;};
+    recognition.onend=()=>{voiceBtn.classList.remove('listening');voiceBtn.textContent='🎤';voiceStatus.classList.remove('show');};
+    recognition.onerror=()=>{voiceBtn.classList.remove('listening');voiceBtn.textContent='🎤';voiceStatus.classList.remove('show');alert('Voice recognition error. Please try again.');};}
+    recognition.start();}
+</script>
+</body>
+</html>
