@@ -81,4 +81,6 @@ def ask():
 # Start Flask app
 if __name__ == "__main__":
     logger.info("Starting optimized chatbot server...")
-    app.run(debug=False)
+    port = int(os.environ.get("PORT", 5000))  # required for Render
+    app.run(host="0.0.0.0", port=port)        # expose port to Render
+
